@@ -87,7 +87,7 @@ KEYS = {
   home: 74,  # Keyboard Home
   pageup: 75,  # Keyboard Page Up
   delete: 76,  # Keyboard Delete Forward
-  _end: 77,  # Keyboard End
+  end: 77,  # Keyboard End
   pagedown: 78,  # Keyboard Page Down
   right: 79,  # Keyboard Right Arrow
   left: 80,  # Keyboard Left Arrow
@@ -110,7 +110,7 @@ KEYS = {
   kp9: 97,  # Keypad 9 and Page Up
   kp0: 98,  # Keypad 0 and Insert
   kpdot: 99,  # Keypad . and Delete
-  _102nd: 100,  # Keyboard Non-US  and |
+  :'102nd' => 100,  # Keyboard Non-US  and |
   compose: 101,  # Keyboard Application
   power: 102,  # Keyboard Power
   kpequal: 103,  # Keypad =
@@ -181,7 +181,61 @@ KEYS = {
   media_sleep: 248,  
   media_coffee: 249,  
   media_refresh: 250,  
-  media_calc: 251
+  media_calc: 251,
+  A: :a, 
+  B: :b, 
+  C: :c, 
+  D: :d, 
+  E: :e, 
+  F: :f, 
+  G: :g, 
+  H: :h, 
+  I: :i, 
+  J: :j, 
+  K: :k, 
+  L: :l, 
+  M: :m, 
+  N: :n, 
+  O: :o, 
+  P: :p, 
+  Q: :q, 
+  R: :r, 
+  S: :s, 
+  T: :t, 
+  U: :u, 
+  V: :v, 
+  W: :w, 
+  X: :x, 
+  Y: :y, 
+  Z: :z, 
+  :'!' => :'1', 
+  :'@' => :'2', 
+  :'#' => :'3', 
+  :'$' => :'4', 
+  :'%' => :'5', 
+  :'^' => :'6', 
+  :'&' => :'7', 
+  :'*' => :'8', 
+  :'(' => :'9', 
+  :')' => :'0', 
+  :'_' => :minus, 
+  :'+' => :equal, 
+  :'{' => :leftbrace, 
+  :'}' => :rightbrace, 
+  :'|' => :backslash, 
+  :'~' => :hashtilde, 
+  :':' => :semicolon, 
+  :'"' => :apostrophe, 
+  :'<' => :comma, 
+  :'>' => :dot, 
+  :'?' => :slash, 
+  clear: :numlock, 
+  down_arrow: :kp2, 
+  pagedn: :kp3, 
+  left_arrow: :kp4, 
+  right_arrow: :kp6, 
+  up_arrow: :kp8, 
+  page_up: :kp9, 
 }
 
 class HidG0
@@ -192,14 +246,33 @@ class HidG0
 
   def keypress(key)
 
-    write_report(NULL_CHAR*2 + KEYS[key.to_sym].chr + NULL_CHAR*5)
+    if KEYS[key.to_sym].is_a? Integer then 
 
+      write_report(NULL_CHAR*2 + KEYS[key.to_sym].chr + NULL_CHAR*5)
+      
+    else
+      
+      write_report(32.chr + NULL_CHAR + KEYS[KEYS[key.to_sym]].chr + \
+                   NULL_CHAR*5)
+      
+    end
+    
     # Release keys
     write_report(NULL_CHAR*8)
 
   end
 
-  def sendkeys()
+  def sendkeys(s)
+    
+    s.gsub(/ /,'{space}').scan(/\{[^\}]+\}|./).each do |x|      
+      
+      if x.length == 1 and x.downcase == x then
+        keypress x
+      else
+        keypress x[1..-2]
+      end
+    end
+    
   end
 
   private
