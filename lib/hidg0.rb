@@ -8,9 +8,58 @@
 
 # The following USB HID keyboard IDs were obtained from https://gist.github.com/MightyPork/6da26e382a7ad91b5496ee55fdc73db2#file-usb_hid_keys-h-L36-L76
 
+require 'c32'
 
 NULL_CHAR = 0.chr
 
+=begin
+
+# Reference notes
+
+## Datum representation
+
+Keyboard sends the data to PC in 8 bytes
+
+
+    1 byte: modifier keys (Control, Shift, Alt, etc.), where each bit corresponds to a key
+    1 byte: unused/reserved for OEM
+    6 bytes: pressed key codes
+    
+coped from: https://www.rmedgar.com/blog/using-rpi-zero-as-keyboard-send-reports
+
+## Modifier keys
+
+BYTE1 BYTE2 BYTE3 BYTE4 BYTE5 BYTE6 BYTE7 BYTE8
+here:
+BYTE1 --
+|--bit0: Left Control if push down is 1
+|--bit1: Left Shift if push down is 1
+|--bit2: Left Alt if push down is 1
+|--bit3: Left GUI if push down is 1
+|--bit4: Right Control if push down is 1
+|--bit5: Right Shift if push down is 1
+|--bit6: Right Alt if push down is 1
+|--bit7: Right GUI if push down is 1
+
+BYTE3 to BYTE8 is the key.
+
+copied from: https://forum.micropython.org/viewtopic.php?t=2021
+=end
+
+# represented in BYTE1
+
+h = %i(right_gui rightalt rightshift rightctrl left_gui left_alt leftshift leftctrl).\
+    reverse.map.with_index {|x,i| [x, (2 ** i)]}.to_h
+MODIFIERS = h.merge({shift: h[:leftshift], alt: h[:left_alt], 
+                     ctrl: h[:leftctrl], control: h[:leftctrl]})
+
+=begin
+                              byte1    byte2   byte3   bytes4...bytes8    
+ e.g. 'right shift' + a #=> 0x32.chr + 0.chr + 0x04.chr + (0.chr*5)
+ 
+=end 
+
+# represented in BYTE3 to BYTE8
 KEYS = {
   none: 0,  # No key pressed
   err_ovf: 1,  # Keyboard Error Roll Over - used for all slots if too many keys are pressed ("Phantom key")
@@ -235,30 +284,19 @@ KEYS = {
   left_arrow: :kp4, 
   right_arrow: :kp6, 
   up_arrow: :kp8, 
-  page_up: :kp9, 
+  page_up: :kp9
 }
 
 class HidG0
+  using ColouredText
 
-  def initialize(dev='/dev/hidg0')
-    @dev = dev
+  def initialize(dev='/dev/hidg0', debug: false)
+    @dev, @debug = dev, debug
   end
 
   def keypress(key)
 
-    if KEYS[key.to_sym].is_a? Integer then 
-
-      write_report(NULL_CHAR*2 + KEYS[key.to_sym].chr + NULL_CHAR*5)
-      
-    else
-      
-      write_report(32.chr + NULL_CHAR + KEYS[KEYS[key.to_sym]].chr + \
-                   NULL_CHAR*5)
-      
-    end
-    
-    # Release keys
-    write_report(NULL_CHAR*8)
+    keydown(key); release_keys()
 
   end
 
@@ -266,16 +304,61 @@ class HidG0
     
     s.gsub(/ /,'{space}').scan(/\{[^\}]+\}|./).each do |x|      
       
-      if x.length == 1 and x.downcase == x then
+      if x.length == 1 and x.downcase == x and x[0] != '{' then
+        
         keypress x
+        
       else
-        keypress x[1..-2]
+        
+        keys = x[1..-2].split('+')
+        puts ('keys: ' +keys.inspect).debug if @debug
+        
+        if keys.length > 1 then
+          
+          # e.g. keys #=> ['ctrl', 's']
+         
+          key = KEYS[keys.pop.to_sym]          
+          modifier = keys.map {|x| MODIFIERS[x.to_sym]}.inject(:+)
+          
+          if @debug then
+            puts ('key: ' + key.inspect).debug
+            puts ('modifier: ' + modifier.inspect).debug
+          end
+          
+          write_report(modifier.chr + NULL_CHAR + key.chr + NULL_CHAR*5)
+          release_keys()
+          
+        else
+          keypress keys.first
+        end
+        
       end
     end
     
   end
 
   private
+  
+  def keydown(key)
+    
+    puts 'keydown | key: ' + key.inspect if @debug
+    
+    if KEYS[key.to_sym].is_a? Integer then 
+
+      write_report(NULL_CHAR*2 + KEYS[key.to_sym].chr + NULL_CHAR*5)
+      
+    else
+      
+      write_report(32.chr + NULL_CHAR + KEYS[KEYS[key.to_sym]].chr + \
+                   NULL_CHAR*5)      
+      
+    end    
+    
+  end
+  
+  def release_keys()
+    write_report(NULL_CHAR*8)
+  end
 
   def write_report(report)
     open(@dev, 'wb+') {|f| f.write report }
