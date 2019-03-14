@@ -294,9 +294,9 @@ class HidG0
     @dev, @debug = dev, debug
   end
 
-  def keypress(key)
+  def keypress(key, duration: 0)
 
-    keydown(key); release_keys()
+    keydown(key); sleep(duration); release_keys()
 
   end
 
@@ -304,7 +304,7 @@ class HidG0
     
     s.gsub(/ /,'{space}').scan(/\{[^\}]+\}|./).each do |x|      
       
-      if x.length == 1 and x.downcase == x and x[0] != '{' then
+      if x.length == 1 and x[0] != '{' then
         
         keypress x
         
@@ -347,10 +347,12 @@ class HidG0
 
       write_report(NULL_CHAR*2 + KEYS[key.to_sym].chr + NULL_CHAR*5)
       
-    else
+    else 
       
-      write_report(32.chr + NULL_CHAR + KEYS[KEYS[key.to_sym]].chr + \
-                   NULL_CHAR*5)      
+      # the key can be reproduced by combining tke key press with the shift key
+      
+      write_report(MODIFIERS[:shift].chr + NULL_CHAR + \
+                   KEYS[KEYS[key.to_sym]].chr + NULL_CHAR*5)      
       
     end    
     
