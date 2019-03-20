@@ -305,7 +305,7 @@ class HidG0
 
   def initialize(dev='/dev/hidg0', debug: false, humanspeed: true)
     @dev, @debug = dev, debug
-    @duration = 0.3 if humanspeed
+    @duration = humanspeed ? 0.3 : 0
   end
 
   def keypress(key, duration: 0)
