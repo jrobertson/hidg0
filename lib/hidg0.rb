@@ -50,6 +50,7 @@ copied from: https://forum.micropython.org/viewtopic.php?t=2021
 
 h = %i(right_gui rightalt rightshift rightctrl left_gui left_alt leftshift leftctrl).\
     reverse.map.with_index {|x,i| [x, (2 ** i)]}.to_h
+
 MODIFIERS = h.merge({shift: h[:leftshift], alt: h[:left_alt], 
                      ctrl: h[:leftctrl], control: h[:leftctrl]})
 
@@ -100,22 +101,35 @@ KEYS = {
   :'9' => 38,  # Keyboard 9 and (
   :'0' => 39,  # Keyboard 0 and )
   enter: 40,  # Keyboard Return (ENTER)
+  :"\n" => 40,
   esc: 41,  # Keyboard ESCAPE
   backspace: 42,  # Keyboard DELETE (Backspace)
   tab: 43,  # Keyboard Tab
   space: 44,  # Keyboard Spacebar
+  :' ' => 44,  # Keyboard Spacebar
   minus: 45,  # Keyboard - and _
+  :'-' => 45,
   equal: 46,  # Keyboard = and +
+  :'=' => 46,
   leftbrace: 47,  # Keyboard [ and {
+  :'[' => 47,
   rightbrace: 48,  # Keyboard ] and }
+  :']' => 48,
   backslash: 49,  # Keyboard  and |
   hashtilde: 50,  # Keyboard Non-US # and ~
+  :'#' => 50,
   semicolon: 51,  # Keyboard ; and :
+  :';' => 51,
   apostrophe: 52,  # Keyboard ' and "
+  :"'" => 52,
   grave: 53,  # Keyboard ` and ~
+  :'`' => 53,
   comma: 54,  # Keyboard , and <
+  :',' => 54,  # Keyboard , and <
   dot: 55,  # Keyboard . and >
+  :'.' => 55,
   slash: 56,  # Keyboard / and ?
+  :'/' => 56,
   capslock: 57,  # Keyboard Caps Lock
   f1: 58,  # Keyboard F1
   f2: 59,  # Keyboard F2
@@ -256,10 +270,9 @@ KEYS = {
   W: :w, 
   X: :x, 
   Y: :y, 
-  Z: :z, 
+  Z: :z,
   :'!' => :'1', 
   :'@' => :'2', 
-  :'#' => :'3', 
   :'$' => :'4', 
   :'%' => :'5', 
   :'^' => :'6', 
@@ -290,8 +303,9 @@ KEYS = {
 class HidG0
   using ColouredText
 
-  def initialize(dev='/dev/hidg0', debug: false)
+  def initialize(dev='/dev/hidg0', debug: false, humanspeed: true)
     @dev, @debug = dev, debug
+    @duration = 0.3 if humanspeed
   end
 
   def keypress(key, duration: 0)
@@ -302,11 +316,17 @@ class HidG0
 
   def sendkeys(s)
     
-    s.gsub(/ /,'{space}').scan(/\{[^\}]+\}|./).each do |x|      
+    # current keymapping is for en-gb
+    
+    # £ is "\u{00A3}" in unicode
+    [["\n",'{enter}'],["\u{00A3}","{shift+3}"],['"','{shift+2}']]\
+        .map {|x,y| s.gsub!(x,y) }
+    
+    s.scan(/\{[^\}]+\}|./).each do |x|
       
       if x.length == 1 and x[0] != '{' then
         
-        keypress x
+        keypress x, duration: @duration
         
       else
         
@@ -329,7 +349,7 @@ class HidG0
           release_keys()
           
         else
-          keypress keys.first
+          keypress keys.first, duration: @duration
         end
         
       end
@@ -350,7 +370,7 @@ class HidG0
     else 
       
       # the key can be reproduced by combining tke key press with the shift key
-      
+      puts ('KEYS[key.to_sym]: ' + KEYS[key.to_sym].inspect).debug if @debug
       write_report(MODIFIERS[:shift].chr + NULL_CHAR + \
                    KEYS[KEYS[key.to_sym]].chr + NULL_CHAR*5)      
       
