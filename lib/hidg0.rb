@@ -52,7 +52,8 @@ h = %i(right_gui rightalt rightshift rightctrl left_gui left_alt leftshift leftc
     reverse.map.with_index {|x,i| [x, (2 ** i)]}.to_h
 
 MODIFIERS = h.merge({shift: h[:leftshift], alt: h[:left_alt], 
-                     ctrl: h[:leftctrl], control: h[:leftctrl]})
+                     ctrl: h[:leftctrl], control: h[:leftctrl], 
+                     windows_key: h[:right_gui]})
 
 =begin
                               byte1    byte2   byte3   bytes4...bytes8    
@@ -102,6 +103,7 @@ KEYS = {
   :'0' => 39,  # Keyboard 0 and )
   enter: 40,  # Keyboard Return (ENTER)
   :"\n" => 40,
+  cr: 40,  
   esc: 41,  # Keyboard ESCAPE
   backspace: 42,  # Keyboard DELETE (Backspace)
   tab: 43,  # Keyboard Tab
@@ -297,7 +299,8 @@ KEYS = {
   left_arrow: :kp4, 
   right_arrow: :kp6, 
   up_arrow: :kp8, 
-  page_up: :kp9
+  page_up: :kp9,
+  windows_key: 0
 }
 
 class HidG0
@@ -310,7 +313,7 @@ class HidG0
 
   def keypress(key, duration: 0)
 
-    keydown(key); sleep(duration); release_keys()
+    keydown(key.strip); sleep(duration); release_keys()
 
   end
 
@@ -319,10 +322,12 @@ class HidG0
     # current keymapping is for en-gb
     
     # £ is "\u{00A3}" in unicode
-    [["\n",'{enter}'],["\u{00A3}","{shift+3}"],['"','{shift+2}']]\
+    [["\u{00A3}","{shift+3}"],['"','{shift+2}']]\
         .map {|x,y| s.gsub!(x,y) }
     
-    s.scan(/\{[^\}]+\}|./).each do |x|
+    s.gsub(/\s*(?=\{)|(?<=\})\s*/,'').scan(/\{[^\}]+\}|./).each do |x|
+      
+      puts ('x: ' + x.inspect).debug if @debug
       
       if x.length == 1 and x[0] != '{' then
         
@@ -330,28 +335,46 @@ class HidG0
         
       else
         
-        keys = x[1..-2].split('+')
-        puts ('keys: ' +keys.inspect).debug if @debug
+        # split by semicolon
         
-        if keys.length > 1 then
+        x[1..-2].split(/\s*;\s*/).each do |instruction|
+        
+          keys = instruction.split('+')        
+        
+
+          puts ('keys: ' + keys.inspect).debug if @debug              
           
-          # e.g. keys #=> ['ctrl', 's']
-         
-          key = KEYS[keys.pop.to_sym]          
-          modifier = keys.map {|x| MODIFIERS[x.to_sym]}.inject(:+)
+          if keys.length > 1 then
+                        
+            # e.g. keys #=> ['ctrl', 's']
           
-          if @debug then
-            puts ('key: ' + key.inspect).debug
-            puts ('modifier: ' + modifier.inspect).debug
+            key = KEYS[keys.pop.to_sym]          
+            modifier = keys.map {|x| MODIFIERS[x.to_sym]}.inject(:+)
+            
+            if @debug then
+              puts ('key: ' + key.inspect).debug
+              puts ('modifier: ' + modifier.inspect).debug
+            end
+            
+            write_report(modifier.chr + NULL_CHAR + key.chr + NULL_CHAR*5)
+            release_keys()
+            
+          else
+               
+            key = keys.first
+            
+            if key =~ /sleep/ then
+              
+              seconds = key[/(?<=sleep )\d+(?:\.\d+)/]
+              puts ('sleeping for ' + seconds + 'seconds').info if @debug
+              sleep seconds.to_f
+              
+            else
+            
+              keypress key, duration: @duration
+            end
           end
-          
-          write_report(modifier.chr + NULL_CHAR + key.chr + NULL_CHAR*5)
-          release_keys()
-          
-        else
-          keypress keys.first, duration: @duration
         end
-        
       end
     end
     
@@ -362,6 +385,8 @@ class HidG0
   def keydown(key)
     
     puts 'keydown | key: ' + key.inspect if @debug
+    
+    return write_report(8.chr + NULL_CHAR*7) if key.to_s =~ /^windows_key$/
     
     if KEYS[key.to_sym].is_a? Integer then 
 
