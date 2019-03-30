@@ -311,9 +311,10 @@ class HidG0
     @duration = humanspeed ? 0.3 : 0
   end
 
-  def keypress(key, duration: 0)
+  def keypress(raw_key, duration: 0)
 
-    keydown(key.strip); sleep(duration); release_keys()
+    key = raw_key.strip.empty? ? raw_key : raw_key.strip
+    keydown(key); sleep(duration); release_keys()
 
   end
 
@@ -322,10 +323,7 @@ class HidG0
     # current keymapping is for en-gb
     
     # £ is "\u{00A3}" in unicode
-    [["\u{00A3}","{shift+3}"],['"','{shift+2}']]\
-        .map {|x,y| s.gsub!(x,y) }
-    
-    s.gsub(/\s*(?=\{)|(?<=\})\s*/,'').scan(/\{[^\}]+\}|./).each do |x|
+    parse_keys(s).each do |x|
       
       puts ('x: ' + x.inspect).debug if @debug
       
@@ -339,6 +337,12 @@ class HidG0
         
         x[1..-2].split(/\s*;\s*/).each do |instruction|
         
+          if instruction =~ /\*\s*\d+/ then
+            key, n = instruction.split('*',2)
+            n.to_i.times {keypress(key, duration: @duration) }
+            next
+          end
+          
           keys = instruction.split('+')        
         
 
@@ -379,6 +383,19 @@ class HidG0
     end
     
   end
+  
+  protected
+  
+  def parse_keys(raw_s)
+    
+    s = raw_s.clone
+    
+    [["\u{00A3}","{shift+3}"],['"','{shift+2}']]\
+        .map {|x,y| s.gsub!(x,y) }
+    
+    s.gsub(/\s*(?=\{)|(?<=\})\s*/,'').scan(/\{[^\}]+\}|./)
+    
+  end
 
   private
   
@@ -412,3 +429,68 @@ class HidG0
   end
 end
 
+class HidG0Plus < HidG0
+  
+  def initialize(instructions='', dev: '/dev/hidg0', debug: false)
+    
+    super(dev, debug: debug, humanspeed: false)
+    @index= 0
+    
+    @keys = parse_keys(instructions).map do |x|
+      
+      puts 'x: ' + x.inspect if @debug
+      
+      if x[0] == '{' then
+
+        x[1..-2].strip.split(/[;,]/).map do |item|
+          
+          if item.strip  =~ /^sleep /
+          
+            next
+            
+          elsif item =~ /\w+\s*\*\s*\d+/
+            
+            key, n = item.split(/\*/,2)
+            [key] * n.to_i
+            
+          else
+            "{%s}" % item.strip
+          end
+          
+        end.compact
+        
+      else
+        x
+      end
+      
+    end.flatten
+    
+  end
+  
+  def index()
+    @index
+  end
+  
+  def keys()
+    
+    @keys
+    
+  end
+  
+  def sendkey()
+    
+    key = @keys[@index]
+    key[0] == '{' ? sendkeys(key) : keypress(key)
+    @index+=1
+    
+  end
+  
+  def next_key()
+    @keys[@index]
+  end
+  
+  def prev_key()
+    @keys[@index-1] unless @index == 0
+  end
+  
+end
