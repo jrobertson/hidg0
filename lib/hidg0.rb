@@ -308,7 +308,7 @@ class HidG0
 
   def initialize(dev='/dev/hidg0', debug: false, humanspeed: true)
     @dev, @debug = dev, debug
-    @duration = humanspeed ? 0.3 : 0
+    @duration = humanspeed ? 0.22 : 0
   end
 
   def keypress(raw_key, duration: 0)
@@ -335,7 +335,7 @@ class HidG0
         
         # split by semicolon
         
-        x[1..-2].split(/\s*;\s*/).each do |instruction|
+        x[1..-2].split(/\s*[;,]\s*/).each do |instruction|
         
           if instruction =~ /\*\s*\d+/ then
             key, n = instruction.split('*',2)
@@ -425,18 +425,20 @@ class HidG0
   end
 
   def write_report(report)
-    open(@dev, 'wb+') {|f| f.write report }
+    open(@dev, 'wb+') {|f| f.write report } if @dev
   end
 end
 
 class HidG0Plus < HidG0
   
-  def initialize(instructions='', dev: '/dev/hidg0', debug: false)
+  def initialize(instructions='', dev: '/dev/hidg0', debug: false, 
+                 progress_units: 100, chunk: true)
     
-    super(dev, debug: debug, humanspeed: false)
-    @index= 0
+    humanspeed = chunk == true
+    super(dev, debug: debug, humanspeed: humanspeed)
+    @index, @progress_units = 0, progress_units
     
-    @keys = parse_keys(instructions).map do |x|
+    a = parse_keys(instructions).map do |x|
       
       puts 'x: ' + x.inspect if @debug
       
@@ -465,32 +467,42 @@ class HidG0Plus < HidG0
       
     end.flatten
     
+    @keys = chunk ? a.chunk_while {|x| x.length == 1}.map(&:join) : a
+    
   end
   
   def index()
     @index
   end
   
-  def keys()
-    
-    @keys
-    
+  def keys()    
+    @keys    
   end
-  
-  def sendkey()
     
-    key = @keys[@index]
-    key[0] == '{' ? sendkeys(key) : keypress(key)
-    @index+=1
-    
-  end
-  
   def next_key()
     @keys[@index]
   end
   
   def prev_key()
     @keys[@index-1] unless @index == 0
+  end  
+  
+  def progress(units=@progress_units)
+    (units / (@keys.length / @index.to_f)).round
   end
+  
+  def reset()
+    @index = 0
+  end
+  
+  def sendkey()
+    
+    return if @index >= @keys.length
+    key = @keys[@index]
+    key.length > 1 ? sendkeys(key) : keypress(key) 
+    @index+=1
+    progress()
+    
+  end  
   
 end
