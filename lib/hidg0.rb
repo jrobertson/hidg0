@@ -305,6 +305,8 @@ KEYS = {
 
 class HidG0
   using ColouredText
+  
+  attr_accessor :duration
 
   def initialize(dev='/dev/hidg0', debug: false, humanspeed: true)
     @dev, @debug = dev, debug
