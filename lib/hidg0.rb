@@ -320,7 +320,7 @@ class HidG0
 
   end
 
-  def sendkeys(s)
+  def sendkeys(s, duration: @duration)
     
     # current keymapping is for en-gb
     
@@ -331,7 +331,7 @@ class HidG0
       
       if x.length == 1 and x[0] != '{' then
         
-        keypress x, duration: @duration
+        keypress x, duration: duration
         
       else
         
@@ -341,7 +341,7 @@ class HidG0
         
           if instruction =~ /\*\s*\d+/ then
             key, n = instruction.split('*',2)
-            n.to_i.times {keypress(key, duration: @duration) }
+            n.to_i.times {keypress(key, duration: duration) }
             next
           end
           
@@ -371,13 +371,13 @@ class HidG0
             
             if key =~ /sleep/ then
               
-              seconds = key[/(?<=sleep )\d+(?:\.\d+)/]
+              seconds = key[/(?<=sleep )\d+(?:\.\d+)?/]
               puts ('sleeping for ' + seconds + 'seconds').info if @debug
               sleep seconds.to_f
               
             else
             
-              keypress key, duration: @duration
+              keypress key, duration: duration
             end
           end
         end
