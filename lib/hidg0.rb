@@ -53,7 +53,7 @@ h = %i(right_gui rightalt rightshift rightctrl left_gui left_alt leftshift leftc
 
 MODIFIERS = h.merge({shift: h[:leftshift], alt: h[:left_alt], 
                      ctrl: h[:leftctrl], control: h[:leftctrl], 
-                     windows_key: h[:right_gui]})
+                     windows_key: h[:right_gui], win: h[:right_gui]})
 
 =begin
                               byte1    byte2   byte3   bytes4...bytes8    
@@ -371,8 +371,8 @@ class HidG0
             
             if key =~ /sleep/ then
               
-              seconds = key[/(?<=sleep )\d+(?:\.\d+)?/]
-              puts ('sleeping for ' + seconds + 'seconds').info if @debug
+              seconds = key[/(?<=sleep )\d+(?:\.\d+)?/] || '0.5'
+              puts ('sleeping for ' + seconds + ' seconds').info if @debug
               sleep seconds.to_f
               
             else

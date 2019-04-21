@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'hidg0'
-  s.version = '0.4.3'
+  s.version = '0.4.4'
   s.summary = 'Used with a Raspberry PI Zero plugged into a computer to act ' + 
       'as USB Keyboard (HID).'
   s.authors = ['James Robertson']
